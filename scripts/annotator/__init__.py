@@ -1,0 +1,1 @@
+from .annotatorwindow import AnnotatorWindow
