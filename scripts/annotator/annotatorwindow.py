@@ -125,7 +125,7 @@ class AnnotatorWindow(Gtk.Window):
 
         # Formatting?
         self.tag_code = self.textbuff.create_tag("code", foreground='#CAE682')
-        self.tag_all(re.compile(r'``.*?``'), self.tag_code)
+        self.tag_all(re.compile(r'``[^`]*``', re.MULTILINE), self.tag_code)
         self.tag_all(re.compile(r'^.*\n\=+\n', re.MULTILINE), self.textbuff.create_tag("head1", foreground='#F0BE35'))
         self.tag_all(re.compile(r'^.*\n\-+\n', re.MULTILINE), self.textbuff.create_tag("head2", foreground='#35BBF0'))
         self.tag_all(re.compile(r'^.*\n\'+\n', re.MULTILINE), self.textbuff.create_tag("head3", foreground='#9F68F7'))
