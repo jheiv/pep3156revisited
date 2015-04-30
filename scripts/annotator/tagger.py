@@ -1,86 +1,149 @@
 import pickle
 
+from gi.repository import Gtk
+
 from . import config
 from .selection import Selection
+from .taggedselection import TaggedSelection
+
+class TagStore:
+    def __init__(self, path):
+        self.path = path
+        self.sels = []
+
+    # Loads a pickled tagstore
+    def load(self, buff):
+        try:
+            with open(self.path, 'rb') as f:
+                self.sels = pickle.load(f)
+                print("Loaded tagstore (%d tagged selections)" % len(self.sels))
+                for ts in self.sels: print("  ", ts, sep='')
+                # Set buff attribute (it's not pickled)
+                for ts in self.sels:
+                    ts.buff = buff
+        except FileNotFoundError:
+            print("Couldn't load tagstore")
+
+
+    # Saves the local tagstore to file
+    def save(self):
+        with open(self.path, 'wb') as f:
+            pickle.dump(self.sels, f)
+
+    #===============================================================================================
+    # Magic Methods
+    #===============================================================================================
+    def __getitem__(self, key):
+        return self.sels[key]
+
+
+    #===============================================================================================
+    # Helper Methods
+    #===============================================================================================
+    # Helper method to find a tagged selection in the tagstore that contains a cursor position
+    def find_selection_index(self, cp):
+        for (i,sel) in enumerate(self):
+            if cp in sel: return i
+        return None
+
+    def selection_conflicts(self, test, name_filter=None):
+        for (i,sel) in enumerate(self):
+            if name_filter is not None and name_filter != sel.name: continue
+            if sel.conflicts_with(test): return True
+        return False
+
 
 
 class Tagger:
     def __init__(self, buffer):
         self.buff = buffer
-        self._tag = self.buff.create_tag("tag_bg", background="#314A94")
+        self.tags = {}
+        for (tag_name, tag_style) in config.TAG_STYLE.items():
+            self.tags[tag_name] = self.buff.create_tag(tag_name, **tag_style)
 
         # Load tags from tagstore
-        try:
-            with open(config.PKL_TAGSTORE,'rb') as f:
-                self.tags = pickle.load(f)
-                print("Loaded tagstore")
-                for t in self.tags: print("  ", t, sep='')
+        self.store = TagStore(config.PKL_TAGSTORE)
+        self.store.load(buffer)
 
-                self.apply_tags()
-        except FileNotFoundError:
-            self.tags = []
+        self.apply_tags()
 
 
-    # Clears all of our tags from the textbuffer
+
+
+
+    #===============================================================================================
+    # Helper Methods
+    #===============================================================================================
+
+
+    #===============================================================================================
+    # Tag "Painter" Methods
+    #===============================================================================================
+    # Clear all instances of a single tag from the TextBuffer
+    def clear_tag(self, tag):
+        if isinstance(tag, str): tag = self.tags[tag]
+        self.buff.remove_tag(tag, self.buff.get_start_iter(), self.buff.get_end_iter())
+
+
+    # Clears all instances of all our tags from the TextBuffer
     def clear_tags(self):
-        self.buff.remove_tag(self._tag, self.buff.get_start_iter(), self.buff.get_end_iter())
+        for tag in self.tags.values(): self.clear_tag(tag)
 
 
     # Applies all tags from the loaded tagstore
     def apply_tags(self):
-        for (so,eo) in self.tags:
-            sel = Selection.from_buffer_offsets(self.buff, so, eo)
-            self.buff.apply_tag(self._tag, sel.siter, sel.eiter)
+        for tagged_sel in self.store.sels:
+            tagged_sel.apply()
 
 
-    # Saves the local tagstore to file
-    def update_tagstore(self):
-        with open(config.PKL_TAGSTORE, 'wb') as f:
-            pickle.dump(self.tags, f)
+    def refresh(self):
+        self.clear_tags()
+        self.apply_tags()
 
-
-    # Helper method to find a tag in the tagstore that wraps a cursor position
-    def _find_tag_index(self, cp):
-        for (i,(so,eo)) in enumerate(self.tags):
-            if so <= cp <= eo:
-                return i
-        return None
-
+    #===============================================================================================
+    # Add / Remove Tagged Selections
+    #===============================================================================================
     # Called from a keypress event
-    def tag(self):
-        sel = Selection.from_buffer_selection(self.buff)
+    def add_tagged_sel(self, tag_name, *, note=None, sel=None):
+        if sel is None: sel = Selection.from_buffer_selection(self.buff)
 
-
-        def check_sel(sel):
-            for (tso, teo) in self.tags:
-                # Make sure neither end of our selection is inside an existing tag
-                if tso in sel: return False
-                if teo in sel: return False
-                # Make sure our selection isn't wholly contained inside an existing tag
-                if (tso < sel.so < teo) and (tso < sel.eo < teo): return False
-            return True
-
-        if not check_sel(sel):
+        if self.store.selection_conflicts(sel, name_filter=tag_name):
             print("Tag collision.")
             return (False, "Tag collision.")
 
-        self.tags.append((sel.siter.get_offset(), sel.eiter.get_offset()))
-        print("Created tag: [%d:%d]" % (sel.siter.get_offset(), sel.eiter.get_offset()))
 
-        self.update_tagstore()
-        self.clear_tags()
-        self.apply_tags()
+        tagged_sel = TaggedSelection(self.buff, tag_name, sel, note)
+        self.store.sels.append(tagged_sel)
+
+        print("Created tag: %s" % tagged_sel)
+
+        self.store.save()
+        self.refresh()
 
 
     # Called from a keypress event
-    def rem(self):
+    def rem_tagged_sel(self):
         cp = self.buff.get_property('cursor-position')
-        i = self._find_tag_index(cp)
-        (so, eo) = self.tags[i]
-        del self.tags[i]
-        print("Removed tag: [%d:%d]" % (so, eo))
+        i = self.store.find_selection_index(cp)
+        tagged_sel = self.store.sels.pop(i)
+        print("Removed tag: %s" % tagged_sel)
 
-        self.update_tagstore()
-        self.clear_tags()
-        self.apply_tags()
+        self.store.save()
+        self.refresh()
+
+    def add_or_edit(self, tag_name, *, note=None, sel=None):
+        try:
+            if sel is None: sel = Selection.from_buffer_selection(self.buff)
+            sel_type = 'sel'
+        except ValueError:
+            sel = self.buff.get_property('cursor-position')
+            sel_type = 'cp'
+
+        if sel_type == 'sel':
+            print("sel")
+        elif sel_type == 'cp':
+            print("cp")
+
+
+
 

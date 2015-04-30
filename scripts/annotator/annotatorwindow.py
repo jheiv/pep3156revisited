@@ -3,6 +3,8 @@ import re
 from gi.repository import Gtk, Pango, Gdk, GtkSource
 
 from .tagger import Tagger
+from .entrydialog import EntryDialog
+from .selection import Selection
 from .common import *
 from . import config
 
@@ -52,11 +54,37 @@ class AnnotatorWindow(Gtk.Window):
         self.textswin.add(self.textview)
 
 
-        self.statusbar = Gtk.Statusbar()
+        info_l = ("Ctrl+w: Add Claim\n"
+                  "Ctrl+e: Add Edit\n"
+                  "Ctrl+r: Remove tagged selection\n")
 
+        info_r = ("Ctrl+a: Edit tagged selection\n")
+
+        self.help_info_l = Gtk.Label(info_l)
+        self.help_info_l.set_halign(Gtk.Align.START)
+        self.help_info_l.set_valign(Gtk.Align.START)
+        self.help_info_l.set_name("help_info_l")
+
+        help_vsep = Gtk.VSeparator()
+
+        self.help_info_r = Gtk.Label(info_r)
+        self.help_info_r.set_halign(Gtk.Align.START)
+        self.help_info_r.set_valign(Gtk.Align.START)
+        self.help_info_r.set_name("help_info_r")
+
+
+        self.helpbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        self.helpbox.pack_start(self.help_info_l, expand=True,  fill=True,  padding=5)
+        self.helpbox.pack_start(help_vsep,        expand=False, fill=False, padding=0)
+        self.helpbox.pack_start(self.help_info_r, expand=True,  fill=True,  padding=5)
+
+        self.helpbox.set_center_widget(help_vsep)
+
+        self.statusbar = Gtk.Statusbar()
 
         self.mainbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         self.mainbox.pack_start(self.textswin,    expand=True,  fill=True,  padding=0)
+        self.mainbox.pack_start(self.helpbox,     expand=False, fill=True,  padding=0)
         self.mainbox.pack_start(Gtk.HSeparator(), expand=False, fill=False, padding=2)
         self.mainbox.pack_start(self.statusbar,   expand=False, fill=False, padding=0)
 
@@ -104,8 +132,9 @@ class AnnotatorWindow(Gtk.Window):
                                     #   (only on) shift (i.e. not caps lock)
         if event.get_state() & Gdk.ModifierType.CONTROL_MASK:
             keyval = event.get_keyval()[1]
-            if keyval == ord('s'):
-                res = self.tagger.tag()
+            keychr = chr(keyval)
+            if keychr == 'w':
+                res = self.tagger.add_tagged_sel('CLAIM')
                 if res is None:
                     self.status_push("Created tag")
                 else:
@@ -114,13 +143,30 @@ class AnnotatorWindow(Gtk.Window):
                                      message_type = Gtk.MessageType.ERROR,
                                      buttons=Gtk.ButtonsType.OK)
 
-            if keyval == ord('r'):
-                self.tagger.rem()
+            if keychr == 'e':
+                # Grab selection
+                sel = Selection.from_buffer_selection(self.textbuff)
+                ed = EntryDialog(self,
+                                 message_format="Enter edit note:",
+                                 message_type=Gtk.MessageType.QUESTION,
+                                 buttons=Gtk.ButtonsType.OK)
+                note = ed.run()
+                res = self.tagger.add_tagged_sel('EDIT', note=note, sel=sel)
+
+            if keychr == 'r':
+                self.tagger.rem_tagged_sel()
                 self.status_push("Removed tag")
 
-            if keyval == ord('d'):
+            if keychr == 'a':
+                self.tagger.add_or_edit(tag_name="test")
+
+            if keychr == 'd':
                 print("Ctrl+D")
                 print(self.textbuff.get_property('cursor-position'))
+
+            if keychr in ['c']:
+                # Allow "default" event handlers to handle these
+                return False
 
 
 

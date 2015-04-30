@@ -1,27 +1,47 @@
 
 class Selection:
+    def __init__(self, soffset, eoffset):
+        self.so = soffset
+        self.eo = eoffset
+
+
+    #===============================================================================================
+    # Alternate Constructors
+    #===============================================================================================
+    @classmethod
+    def from_iters(cls, siter, eiter):
+        so = siter.get_offset()
+        eo = eiter.get_offset()
+        return cls(so, eo)
+
     @classmethod
     def from_buffer_selection(cls, buffer):
-        self = cls()
         si, ei = buffer.get_selection_bounds()
-        self.siter = si
-        self.eiter = ei
-        return self
+        return cls.from_iters(si, ei)
 
-    @classmethod
-    def from_buffer_offsets(cls, buffer, so, eo):
-        self = cls()
-        self.siter = buffer.get_iter_at_offset(so)
-        self.eiter = buffer.get_iter_at_offset(eo)
-        return self
 
-    @property
-    def so(self): return self.siter.get_offset()
-    @property
-    def eo(self): return self.eiter.get_offset()
+    #===============================================================================================
+    # Magic Methods
+    #===============================================================================================
+    def __repr__(self):
+        return "Selection(%d:%d)" % (self.so, self.eo)
 
     def __contains__(self, cp):
-        return self.siter.get_offset() <= cp <= self.eiter.get_offset()
+        return self.so <= cp < self.eo
 
-    def __repr__(self):
-        return "Selection(%d:%d)" % (self.siter.get_offset(), self.eiter.get_offset())
+
+    #===============================================================================================
+    # Helpers
+    #===============================================================================================
+    def conflicts_with(self, that):
+        # Test whether either of that's endpoints are inside this's endpoints
+        if that.so in self: return True
+        if that.eo in self: return True
+        # Test whether either of this's endpoints are inside that's endpoints
+        if self.so in that: return True
+        if self.eo in that: return True
+        # Else, return False
+        return False
+
+    def si(self, buffer): buffer.get_iter_at_offset(self.so)
+    def ei(self, buffer): buffer.get_iter_at_offset(self.eo)
