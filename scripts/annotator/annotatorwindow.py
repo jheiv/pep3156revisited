@@ -126,6 +126,9 @@ class AnnotatorWindow(Gtk.Window):
         # Formatting?
         self.tag_code = self.textbuff.create_tag("code", foreground='#CAE682')
         self.tag_all(re.compile(r'``.*?``'), self.tag_code)
+        self.tag_all(re.compile(r'^.*\n\=+\n', re.MULTILINE), self.textbuff.create_tag("head1", foreground='#F0BE35'))
+        self.tag_all(re.compile(r'^.*\n\-+\n', re.MULTILINE), self.textbuff.create_tag("head2", foreground='#35BBF0'))
+        self.tag_all(re.compile(r'^.*\n\'+\n', re.MULTILINE), self.textbuff.create_tag("head3", foreground='#9F68F7'))
 
         self.key_seq_state = KeySequenceState.WaitingInitiator
         self.key_seq_hist  = None
@@ -158,7 +161,7 @@ class AnnotatorWindow(Gtk.Window):
                     self.status_push("Removed tag")
 
                 elif keychr == 'd':
-                    print("Ctrl+D")
+                    print("Ctrl+D: DEBUG")
                     print(self.textbuff.get_property('cursor-position'))
 
                 elif keychr == 'c':
@@ -181,13 +184,25 @@ class AnnotatorWindow(Gtk.Window):
                                      message_type = Gtk.MessageType.ERROR,
                                      buttons=Gtk.ButtonsType.OK)
             elif key_seq == ('e','c'):
-                #self.tagger.edit_tagged_sel(tag_name='CLAIM')
-                print("No way to edit CLAIM tagged selection currently.")
+                cp = self.textbuff.get_property('cursor-position')      # Get cursor position
+
+                tag_sel_idx  = self.tagger.store.find_selection_index(cp, name_filter='CLAIM')
+                if tag_sel_idx is not None:
+                    tag_sel      = self.tagger.store[tag_sel_idx]
+                    tag_sel_note = tag_sel.note
+
+                    ed = EntryDialog(self,
+                                     message_format="Enter edit note:",
+                                     message_type=Gtk.MessageType.QUESTION,
+                                     buttons=Gtk.ButtonsType.OK,
+                                     default_value=tag_sel_note)
+                    note = ed.run()
+                    ed.destroy()
+                    if note is not None: self.tagger.edit_tagged_sel(tag_sel_idx, note=note)
 
             #------------------------------------------------------- # Do something with an EDIT tag
             elif key_seq == ('a','e'):
-                # Grab selection
-                sel = Selection.from_buffer_selection(self.textbuff)
+                sel = Selection.from_buffer_selection(self.textbuff)    # Grab selection
                 ed = EntryDialog(self,
                                  message_format="Enter edit note:",
                                  message_type=Gtk.MessageType.QUESTION,
@@ -197,8 +212,7 @@ class AnnotatorWindow(Gtk.Window):
                 res = self.tagger.add_tagged_sel('EDIT', note=note, sel=sel)
 
             elif key_seq == ('e','e'):
-                # Get cursor position
-                cp = self.textbuff.get_property('cursor-position')
+                cp = self.textbuff.get_property('cursor-position')      # Get cursor position
 
                 tag_sel_idx  = self.tagger.store.find_selection_index(cp, name_filter='EDIT')
                 if tag_sel_idx is not None:
@@ -260,8 +274,14 @@ class AnnotatorWindow(Gtk.Window):
         self.textview.connect("button-press-event",   shift_mouse_event)
         self.textview.connect("button-release-event", shift_mouse_event)
         self.textview.connect('motion-notify-event',  shift_mouse_event)
+        self.textview.connect_after('motion-notify-event', self.on_mouse_move)
 
         self.show_all()
+
+    # Tagged Selection hover tooltip support
+    def on_mouse_move(self, widget, event):
+        print(widget)
+        print(event)
 
 
     def raise_modal(self, message, *,

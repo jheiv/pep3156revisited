@@ -60,7 +60,7 @@ class Tagger:
     def __init__(self, buffer):
         self.buff = buffer
         self.tags = {}
-        for (tag_name, tag_style) in config.TAG_STYLE.items():
+        for (tag_name, tag_style) in config.TAG_STYLE:
             self.tags[tag_name] = self.buff.create_tag(tag_name, **tag_style)
 
         # Load tags from tagstore
@@ -136,7 +136,10 @@ class Tagger:
 
     # Called from a keypress event
     def edit_tagged_sel(self, tag_sel_idx, *, note=None):
-        self.store[tag_sel_idx].note = note
+        tagged_sel = self.store[tag_sel_idx]
+        old_note = tagged_sel.note
+        tagged_sel.note = note
+        print("Updated note: %s -> %s" % (repr(old_note), repr(note)))
 
         self.store.save()
 
