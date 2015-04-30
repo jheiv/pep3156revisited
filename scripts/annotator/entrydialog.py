@@ -11,8 +11,11 @@ class EntryDialog(Gtk.MessageDialog):
             default_value = kwargs.pop('default_value')
         else:
             default_value = ''
+
         super().__init__(*args, **kwargs)
         entry = Gtk.Entry()
+        entry.set_width_chars(50)
+        #entry = Gtk.TextView()
         entry.set_text(str(default_value))
         entry.connect("activate",
                       lambda ent, dlg, resp: dlg.response(resp),

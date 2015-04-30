@@ -5,6 +5,7 @@ from gi.repository import Gtk
 from . import config
 from .selection import Selection
 from .taggedselection import TaggedSelection
+from .entrydialog import EntryDialog
 
 class TagStore:
     def __init__(self, path):
@@ -41,8 +42,9 @@ class TagStore:
     # Helper Methods
     #===============================================================================================
     # Helper method to find a tagged selection in the tagstore that contains a cursor position
-    def find_selection_index(self, cp):
+    def find_selection_index(self, cp, name_filter=None):
         for (i,sel) in enumerate(self):
+            if name_filter is not None and name_filter != sel.name: continue
             if cp in sel: return i
         return None
 
@@ -112,6 +114,7 @@ class Tagger:
             return (False, "Tag collision.")
 
 
+        if note is None: note = ''
         tagged_sel = TaggedSelection(self.buff, tag_name, sel, note)
         self.store.sels.append(tagged_sel)
 
@@ -131,19 +134,11 @@ class Tagger:
         self.store.save()
         self.refresh()
 
-    def add_or_edit(self, tag_name, *, note=None, sel=None):
-        try:
-            if sel is None: sel = Selection.from_buffer_selection(self.buff)
-            sel_type = 'sel'
-        except ValueError:
-            sel = self.buff.get_property('cursor-position')
-            sel_type = 'cp'
+    # Called from a keypress event
+    def edit_tagged_sel(self, tag_sel_idx, *, note=None):
+        self.store[tag_sel_idx].note = note
 
-        if sel_type == 'sel':
-            print("sel")
-        elif sel_type == 'cp':
-            print("cp")
-
+        self.store.save()
 
 
 

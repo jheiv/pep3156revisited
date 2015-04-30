@@ -1,4 +1,6 @@
 import re
+import sys
+from enum import Enum
 
 from gi.repository import Gtk, Pango, Gdk, GtkSource
 
@@ -7,6 +9,12 @@ from .entrydialog import EntryDialog
 from .selection import Selection
 from .common import *
 from . import config
+
+class KeySequenceState(Enum):
+    WaitingInitiator = 1
+    FoundInitiator = 2
+
+
 
 class AnnotatorWindow(Gtk.Window):
 
@@ -17,7 +25,7 @@ class AnnotatorWindow(Gtk.Window):
         # Init
         super().__init__(title="Annotator")
         self.set_border_width(5)
-        self.set_default_size(400, 550)
+        self.set_default_size(800, 850)
 
         use_source_view = True
         if use_source_view:
@@ -28,6 +36,7 @@ class AnnotatorWindow(Gtk.Window):
         self.textview.set_border_width(10)
         self.textview.modify_font(Pango.font_description_from_string("Consolas 11"))
         self.textview.set_editable(False)
+        #self.textview.set_size_request(800, 650)
 
 
         if use_source_view:
@@ -54,20 +63,24 @@ class AnnotatorWindow(Gtk.Window):
         self.textswin.add(self.textview)
 
 
-        info_l = ("Ctrl+w: Add Claim\n"
-                  "Ctrl+e: Add Edit\n"
-                  "Ctrl+r: Remove tagged selection\n")
+        info_l = ("<b>Ctrl+a, c:</b>\t Add Claim\n"
+                  "<b>Ctrl+a, e:</b>\t Add Edit\n"
+                  "<b>Ctrl+r:</b>\t\t Remove tagged selection\n")
 
-        info_r = ("Ctrl+a: Edit tagged selection\n")
+        info_r = ("<b>Ctrl+e, c:</b>\t Edit Claim (does nothing)\n"
+                  "<b>Ctrl+e, e:</b>\t Edit Edit\n"
+                  "<b>Ctrl+d:</b>\t\t Debug Hotkey - could do anything\n")
 
-        self.help_info_l = Gtk.Label(info_l)
+        self.help_info_l = Gtk.Label()
+        self.help_info_l.set_markup(info_l)
         self.help_info_l.set_halign(Gtk.Align.START)
         self.help_info_l.set_valign(Gtk.Align.START)
         self.help_info_l.set_name("help_info_l")
 
         help_vsep = Gtk.VSeparator()
 
-        self.help_info_r = Gtk.Label(info_r)
+        self.help_info_r = Gtk.Label()
+        self.help_info_r.set_markup(info_r)
         self.help_info_r.set_halign(Gtk.Align.START)
         self.help_info_r.set_valign(Gtk.Align.START)
         self.help_info_r.set_name("help_info_r")
@@ -77,8 +90,6 @@ class AnnotatorWindow(Gtk.Window):
         self.helpbox.pack_start(self.help_info_l, expand=True,  fill=True,  padding=5)
         self.helpbox.pack_start(help_vsep,        expand=False, fill=False, padding=0)
         self.helpbox.pack_start(self.help_info_r, expand=True,  fill=True,  padding=5)
-
-        self.helpbox.set_center_widget(help_vsep)
 
         self.statusbar = Gtk.Statusbar()
 
@@ -116,6 +127,8 @@ class AnnotatorWindow(Gtk.Window):
         self.tag_code = self.textbuff.create_tag("code", foreground='#CAE682')
         self.tag_all(re.compile(r'``.*?``'), self.tag_code)
 
+        self.key_seq_state = KeySequenceState.WaitingInitiator
+        self.key_seq_hist  = None
 
         self.status_push("Initialized.")
 
@@ -130,10 +143,35 @@ class AnnotatorWindow(Gtk.Window):
         #print(event.get_keycode()) # This will return the upper case version, regardless of shift
         #print(event.get_keyval())  # This will return the upper or lower case version depending
                                     #   (only on) shift (i.e. not caps lock)
-        if event.get_state() & Gdk.ModifierType.CONTROL_MASK:
-            keyval = event.get_keyval()[1]
-            keychr = chr(keyval)
-            if keychr == 'w':
+
+        keyval = event.get_keyval()[1]
+        keychr = chr(keyval)
+        if self.key_seq_state == KeySequenceState.WaitingInitiator:
+            if event.get_state() & Gdk.ModifierType.CONTROL_MASK:
+                if keychr in 'ae':
+                    self.key_seq_hist = keychr
+                    self.key_seq_state = KeySequenceState.FoundInitiator
+
+                elif keychr == 'r':
+                    # Remove
+                    self.tagger.rem_tagged_sel()
+                    self.status_push("Removed tag")
+
+                elif keychr == 'd':
+                    print("Ctrl+D")
+                    print(self.textbuff.get_property('cursor-position'))
+
+                elif keychr == 'c':
+                    # Allow "default" event handlers to handle these
+                    return False
+
+
+
+
+        elif self.key_seq_state == KeySequenceState.FoundInitiator:
+            key_seq = (self.key_seq_hist, keychr)
+            #------------------------------------------------------- # Do something with a CLAIM tag
+            if key_seq == ('a','c'):
                 res = self.tagger.add_tagged_sel('CLAIM')
                 if res is None:
                     self.status_push("Created tag")
@@ -142,8 +180,12 @@ class AnnotatorWindow(Gtk.Window):
                     self.raise_modal("Could not add tag: %s" % res[1],
                                      message_type = Gtk.MessageType.ERROR,
                                      buttons=Gtk.ButtonsType.OK)
+            elif key_seq == ('e','c'):
+                #self.tagger.edit_tagged_sel(tag_name='CLAIM')
+                print("No way to edit CLAIM tagged selection currently.")
 
-            if keychr == 'e':
+            #------------------------------------------------------- # Do something with an EDIT tag
+            elif key_seq == ('a','e'):
                 # Grab selection
                 sel = Selection.from_buffer_selection(self.textbuff)
                 ed = EntryDialog(self,
@@ -151,22 +193,30 @@ class AnnotatorWindow(Gtk.Window):
                                  message_type=Gtk.MessageType.QUESTION,
                                  buttons=Gtk.ButtonsType.OK)
                 note = ed.run()
+                ed.destroy()
                 res = self.tagger.add_tagged_sel('EDIT', note=note, sel=sel)
 
-            if keychr == 'r':
-                self.tagger.rem_tagged_sel()
-                self.status_push("Removed tag")
+            elif key_seq == ('e','e'):
+                # Get cursor position
+                cp = self.textbuff.get_property('cursor-position')
 
-            if keychr == 'a':
-                self.tagger.add_or_edit(tag_name="test")
+                tag_sel_idx  = self.tagger.store.find_selection_index(cp, name_filter='EDIT')
+                if tag_sel_idx is not None:
+                    tag_sel      = self.tagger.store[tag_sel_idx]
+                    tag_sel_note = tag_sel.note
 
-            if keychr == 'd':
-                print("Ctrl+D")
-                print(self.textbuff.get_property('cursor-position'))
+                    ed = EntryDialog(self,
+                                     message_format="Enter edit note:",
+                                     message_type=Gtk.MessageType.QUESTION,
+                                     buttons=Gtk.ButtonsType.OK,
+                                     default_value=tag_sel_note)
+                    note = ed.run()
+                    ed.destroy()
+                    if note is not None: self.tagger.edit_tagged_sel(tag_sel_idx, note=note)
 
-            if keychr in ['c']:
-                # Allow "default" event handlers to handle these
-                return False
+            # Reset key_seq stuff
+            self.key_seq_hist = None
+            self.key_seq_state = KeySequenceState.WaitingInitiator
 
 
 
