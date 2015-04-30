@@ -270,18 +270,32 @@ class AnnotatorWindow(Gtk.Window):
 
         self.connect("delete-event", Gtk.main_quit)
         self.connect("key-press-event", self.key_press)
+        self.textview.connect('motion-notify-event',  self.on_mouse_move)
         # Since our TextView has a border, the mouse event coordinates are offset (bug?)
+        #   (Must be connected after (logic-wise) any handlers that hook these events)
         self.textview.connect("button-press-event",   shift_mouse_event)
         self.textview.connect("button-release-event", shift_mouse_event)
         self.textview.connect('motion-notify-event',  shift_mouse_event)
-        self.textview.connect_after('motion-notify-event', self.on_mouse_move)
+
 
         self.show_all()
 
     # Tagged Selection hover tooltip support
     def on_mouse_move(self, widget, event):
-        print(widget)
-        print(event)
+        window_type = self.textview.get_window_type(event.window)
+        bx, by = self.textview.window_to_buffer_coords(window_type, event.x, event.y)
+        #print(bx, by)
+        (view_iter, _) = self.textview.get_iter_at_position(bx, by)
+        iter_offset = view_iter.get_offset()
+        tagged_sels = self.tagger.store.find_all_tagged_selections(iter_offset)
+        #print(iter_offset, len(tagged_sels))
+        if tagged_sels:
+            tooltip_text = '\n---\n'.join([ts.note for ts in tagged_sels])
+            if tooltip_text.strip() == '': tooltip_text = '<i>No note specified</i>'
+        else:
+            tooltip_text = None
+
+        self.textview.set_tooltip_markup(tooltip_text)
 
 
     def raise_modal(self, message, *,

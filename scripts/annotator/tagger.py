@@ -54,6 +54,12 @@ class TagStore:
             if sel.conflicts_with(test): return True
         return False
 
+    def find_all_tagged_selections(self, cp):
+        tagged_selections = []
+        for sel in self:
+            if cp in sel: tagged_selections.append(sel)
+        return tagged_selections
+
 
 
 class Tagger:
