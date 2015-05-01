@@ -1,6 +1,6 @@
 import pickle
-import csv
 import itertools
+from datetime import datetime
 
 from gi.repository import Gtk
 
@@ -36,14 +36,12 @@ class TagStore:
 
     # Dump tagstore contents to a .csv file
     def dump(self, csvfile):
-        with open(csvfile, 'w') as f:  # newline=''
-            # Using QUOTE_NONE here because we've already used repr() on any strings
-            #writer = csv.writer(f, escapechar='\\', quoting=csv.QUOTE_NONE)
+        with open(csvfile, 'w') as f:
+            print("# Generated: %s" % datetime.utcnow().ctime(), file=f)
             ssels = sorted(self.sels, key=lambda s:(s.name, s.sel.so))
             for (name,items) in itertools.groupby(ssels, key=lambda s:s.name):
                 for ts in items:
                     row = ts.to_list()
-                    #writer.writerow(row)
                     print(','.join(row), file=f)
 
 
