@@ -32,6 +32,7 @@ class TaggedSelection:
         sel = Selection.from_iters(siter, eiter)
         return cls(buffer, tag_name, sel)
 
+
     @classmethod
     def from_buffer_selection(cls, buffer, tag_name):
         sel = Selection.from_buffer_selection(buffer)
@@ -56,6 +57,7 @@ class TaggedSelection:
         }
         return state
 
+
     # Test whether a given cursor position is inside this selection range
     def __contains__(self, cp):
         return (cp in self.sel)
@@ -67,9 +69,9 @@ class TaggedSelection:
     def conflicts_with(self, sel):
         return self.sel.conflicts_with(sel)
 
+
     def to_list(self):
         return [repr(self.name), str(self.so), str(self.eo), repr(self.note)]
-
 
 
     #===============================================================================================

@@ -14,6 +14,7 @@ class Selection:
         eo = eiter.get_offset()
         return cls(so, eo)
 
+
     @classmethod
     def from_buffer_selection(cls, buffer):
         si, ei = buffer.get_selection_bounds()
@@ -25,6 +26,7 @@ class Selection:
     #===============================================================================================
     def __repr__(self):
         return "Selection(%d:%d)" % (self.so, self.eo)
+
 
     def __contains__(self, cp):
         return self.so <= cp < self.eo
@@ -42,6 +44,7 @@ class Selection:
         if self.eo in that: return True
         # Else, return False
         return False
+
 
     def si(self, buffer): buffer.get_iter_at_offset(self.so)
     def ei(self, buffer): buffer.get_iter_at_offset(self.eo)

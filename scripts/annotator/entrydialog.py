@@ -24,8 +24,10 @@ class EntryDialog(Gtk.MessageDialog):
         self.vbox.show_all()
         self.entry = entry
 
+
     def set_value(self, text):
         self.entry.set_text(text)
+
 
     def run(self):
         result = super().run()

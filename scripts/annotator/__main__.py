@@ -2,17 +2,15 @@ import sys
 import os.path
 
 
-
-
 # Reformat argv[0] like unittest
 if sys.argv[0].endswith("__main__.py"):
     executable = os.path.basename(sys.executable)
     sys.argv[0] = executable + " -m " + __package__
 
+
 # Pop argv[1] if it's the CWD (PyDev weirdness)
 if sys.argv[1] == os.path.abspath(__package__):
     del sys.argv[1]
-
 
 
 if not 'dump' in sys.argv:

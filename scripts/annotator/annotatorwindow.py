@@ -1,5 +1,4 @@
 import re
-import sys
 from enum import Enum
 
 from gi.repository import Gtk, Pango, Gdk, GtkSource
@@ -10,6 +9,7 @@ from .selection import Selection
 from .common import *
 from . import config
 
+
 class KeySequenceState(Enum):
     WaitingInitiator = 1
     FoundInitiator = 2
@@ -17,7 +17,6 @@ class KeySequenceState(Enum):
 
 
 class AnnotatorWindow(Gtk.Window):
-
     def __init__(self):
         # Code completion hints, will be clobbered
         self.textbuff = Gtk.TextBuffer()
@@ -38,7 +37,6 @@ class AnnotatorWindow(Gtk.Window):
         self.textview.set_editable(False)
         #self.textview.set_size_request(800, 650)
 
-
         if use_source_view:
             self.textview.set_show_line_numbers(True)
             gutter = self.textview.get_gutter(Gtk.TextWindowType.LEFT)
@@ -53,15 +51,12 @@ class AnnotatorWindow(Gtk.Window):
             renderer.set_background(RGBA('#363636'))
             renderer.set_padding(7,-1)
 
-
-
         self.textbuff = self.textview.get_buffer()
         self.load_file(config.PEP_FILE)
 
         self.textswin = Gtk.ScrolledWindow()
         self.textswin.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)  # @UndefinedVariable
         self.textswin.add(self.textview)
-
 
         info_l = ("<b>Ctrl+a, c:</b>\t Add Claim\n"
                   "<b>Ctrl+a, e:</b>\t Add Edit\n"
@@ -85,7 +80,6 @@ class AnnotatorWindow(Gtk.Window):
         self.help_info_r.set_valign(Gtk.Align.START)
         self.help_info_r.set_name("help_info_r")
 
-
         self.helpbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         self.helpbox.pack_start(self.help_info_l, expand=True,  fill=True,  padding=5)
         self.helpbox.pack_start(help_vsep,        expand=False, fill=False, padding=0)
@@ -98,7 +92,6 @@ class AnnotatorWindow(Gtk.Window):
         self.mainbox.pack_start(self.helpbox,     expand=False, fill=True,  padding=0)
         self.mainbox.pack_start(Gtk.HSeparator(), expand=False, fill=False, padding=2)
         self.mainbox.pack_start(self.statusbar,   expand=False, fill=False, padding=0)
-
 
         self.add(self.mainbox)
 
@@ -135,6 +128,7 @@ class AnnotatorWindow(Gtk.Window):
 
         self.status_push("Initialized.")
 
+
     def status_push(self, text, context_desc=None):
         context_id = self.statusbar.get_context_id(str(context_desc))
         return self.statusbar.push(context_id, text)
@@ -146,7 +140,6 @@ class AnnotatorWindow(Gtk.Window):
         #print(event.get_keycode()) # This will return the upper case version, regardless of shift
         #print(event.get_keyval())  # This will return the upper or lower case version depending
                                     #   (only on) shift (i.e. not caps lock)
-
         keyval = event.get_keyval()[1]
         keychr = chr(keyval)
         if self.key_seq_state == KeySequenceState.WaitingInitiator:
@@ -167,9 +160,6 @@ class AnnotatorWindow(Gtk.Window):
                 elif keychr == 'c':
                     # Allow "default" event handlers to handle these
                     return False
-
-
-
 
         elif self.key_seq_state == KeySequenceState.FoundInitiator:
             key_seq = (self.key_seq_hist, keychr)
@@ -233,14 +223,15 @@ class AnnotatorWindow(Gtk.Window):
             self.key_seq_state = KeySequenceState.WaitingInitiator
 
 
-
         # Return True no matter what the event, since the TextView is not editable and to suppress
         #  the bell sounds
         return True
 
+
     def load_file(self, filename):
         with open(filename, "r", encoding='utf-8') as f: cont = f.read()
         self.textbuff.set_text(cont)
+
 
     def tag_all(self, regex_obj, tag):
         offset = 0
@@ -277,8 +268,8 @@ class AnnotatorWindow(Gtk.Window):
         self.textview.connect("button-release-event", shift_mouse_event)
         self.textview.connect('motion-notify-event',  shift_mouse_event)
 
-
         self.show_all()
+
 
     # Tagged Selection hover tooltip support
     def on_mouse_move(self, widget, event):
