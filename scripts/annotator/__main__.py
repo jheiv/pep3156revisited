@@ -9,8 +9,11 @@ if sys.argv[0].endswith("__main__.py"):
 
 
 # Pop argv[1] if it's the CWD (PyDev weirdness)
-if sys.argv[1] == os.path.abspath(__package__):
-    del sys.argv[1]
+try:
+    if sys.argv[1] == os.path.abspath(__package__):
+        del sys.argv[1]
+except IndexError:
+    pass
 
 
 if not 'dump' in sys.argv:
