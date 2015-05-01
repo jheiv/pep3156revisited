@@ -1,4 +1,6 @@
 import pickle
+import csv
+import itertools
 
 from gi.repository import Gtk
 
@@ -13,15 +15,15 @@ class TagStore:
         self.sels = []
 
     # Loads a pickled tagstore
-    def load(self, buff):
+    def load(self, buff=None):
         try:
             with open(self.path, 'rb') as f:
                 self.sels = pickle.load(f)
                 print("Loaded tagstore (%d tagged selections)" % len(self.sels))
                 for ts in self.sels: print("  ", ts, sep='')
                 # Set buff attribute (it's not pickled)
-                for ts in self.sels:
-                    ts.buff = buff
+                if buff is not None:
+                    for ts in self.sels: ts.buff = buff
         except FileNotFoundError:
             print("Couldn't load tagstore")
 
@@ -30,6 +32,22 @@ class TagStore:
     def save(self):
         with open(self.path, 'wb') as f:
             pickle.dump(self.sels, f)
+
+
+    # Dump tagstore contents to a .csv file
+    def dump(self, csvfile):
+        with open(csvfile, 'w') as f:  # newline=''
+            # Using QUOTE_NONE here because we've already used repr() on any strings
+            #writer = csv.writer(f, escapechar='\\', quoting=csv.QUOTE_NONE)
+            ssels = sorted(self.sels, key=lambda s:(s.name, s.sel.so))
+            for (name,items) in itertools.groupby(ssels, key=lambda s:s.name):
+                for ts in items:
+                    row = ts.to_list()
+                    #writer.writerow(row)
+                    print(','.join(row), file=f)
+
+
+
 
     #===============================================================================================
     # Magic Methods

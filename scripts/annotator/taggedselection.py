@@ -67,6 +67,10 @@ class TaggedSelection:
     def conflicts_with(self, sel):
         return self.sel.conflicts_with(sel)
 
+    def to_list(self):
+        return [repr(self.name), str(self.so), str(self.eo), repr(self.note)]
+
+
 
     #===============================================================================================
     # Painters
