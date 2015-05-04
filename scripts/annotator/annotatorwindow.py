@@ -4,10 +4,26 @@ from enum import Enum
 from gi.repository import Gtk, Pango, Gdk, GtkSource
 
 from .tagger import Tagger
-from .entrydialog import EntryDialog
 from .selection import Selection
+from .dialog import *
 from .common import *
 from . import config
+
+
+
+class EditTagDialog(InputDialog):
+    def __init__(self, default_note, **kwargs):
+        super().__init__(message="Enter edit note:",
+                         default_value=default_note,
+                         buttons=Gtk.ButtonsType.OK,
+                         **kwargs)
+
+
+
+class UpdateErrorDialog(MessageDialog):
+    def __init__(self, error_message, **kwargs):
+        super().__init__(message=error_message,
+                         **kwargs)
 
 
 
@@ -34,6 +50,7 @@ class AnnotatorWindow(Gtk.Window):
         self.textview.modify_font(Pango.font_description_from_string(config.TEXTVIEW_FONTDESC))
         self.textview.set_editable(False)
         self.textview.set_show_line_numbers(True)
+        #self.textview.set_highlight_current_line(True)
         gutter = self.textview.get_gutter(Gtk.TextWindowType.LEFT)
 
         def find_gutter_renderer():
@@ -125,24 +142,26 @@ class AnnotatorWindow(Gtk.Window):
         #print(event.get_keyval())  # This will return the upper or lower case version depending
                                     #   (only on) shift (i.e. not caps lock)
         #-------------------------------------------------------------------- Local Helper Functions
-        def handle_add_result(res):
+        def add_tagged_sel(tag_name, prompt_note):
+            sel = Selection.from_buffer_selection(self.textbuff)
+            note = self.raise_dialog(EditTagDialog, '') if prompt_note else None
+            res = self.tagger.add_tagged_sel(tag_name, note=note, sel=sel)
+
             if res is None:
-                self.status_push("Created tag")
+                self.status_push("Created tagged selection")
             else:
                 self.status_push(res[1])
-                self.raise_modal("Could not add tag: %s" % res[1],
-                                 message_type=Gtk.MessageType.ERROR,
-                                 buttons=Gtk.ButtonsType.OK)
+                self.raise_dialog(UpdateErrorDialog, "Could not add tagged selection: %s" % res[1])
 
-        def create_edit_dialog(default=''):
-            ed = EntryDialog(self,
-                             message_format="Enter edit note:",
-                             message_type=Gtk.MessageType.QUESTION,
-                             buttons=Gtk.ButtonsType.OK,
-                             default_value=default)
-            response = ed.run()
-            ed.destroy()
-            return response
+
+        def edit_tagged_sel(tag_name):
+            cp = self.textbuff.get_property('cursor-position')          # Get cursor position
+            tag_sel_idx  = self.tagger.store.find_selection_index(cp, name_filter=tag_name)
+            if tag_sel_idx is not None:
+                note = self.raise_dialog(EditTagDialog, self.tagger.store[tag_sel_idx].note)
+                if note is not None:
+                    self.tagger.edit_tagged_sel(tag_sel_idx, note=note)
+
 
         #------------------------------------------------------------------------------- Begin Logic
         keyval = event.get_keyval()[1]
@@ -154,12 +173,21 @@ class AnnotatorWindow(Gtk.Window):
                     self.key_seq_state = KeySequenceState.FoundInitiator
 
                 elif keychr == 'r':                                     # Remove tag
-                    self.tagger.rem_tagged_sel()
-                    self.status_push("Removed tag")
+                    err = self.tagger.rem_tagged_sel()
+                    if err: self.status_push(err)
+                    else:   self.status_push("Removed tag")
+
+                elif keychr == 'j':                                     # Jump dialog
+                    jline = 750
+                    jiter = self.textbuff.get_iter_at_line(jline)
+                    self.textview.scroll_to_iter(jiter, 0, True, 0.5, 0.5)
 
                 elif keychr == 'd':                                     # Debug hotkey
                     print("Ctrl+D: DEBUG")
-                    print(self.textbuff.get_property('cursor-position'))
+                    resp = self.raise_dialog(MessageDialog, "Message")
+                    print(resp)
+                    resp = self.raise_dialog(InputDialog, "Message", default_value="default")
+                    print(resp)
 
                 elif keychr == 'c':
                     # Allow "default" event handlers to handle these
@@ -168,33 +196,13 @@ class AnnotatorWindow(Gtk.Window):
         elif self.key_seq_state == KeySequenceState.FoundInitiator:
             key_seq = (self.key_seq_hist, keychr)
             #----------------------------------------------------------------------------- Add a tag
-            if key_seq == ('a','c'):                                    # Add CLAIM tag
-                res = self.tagger.add_tagged_sel('CLAIM')
-                handle_add_result(res)
-
-            elif key_seq == ('a','e'):                                  # Add EDIT tag
-                sel = Selection.from_buffer_selection(self.textbuff)    # Grab selection
-                note = note = create_edit_dialog()
-                res = self.tagger.add_tagged_sel('EDIT', note=note, sel=sel)
-                handle_add_result(res)
-
+            if   key_seq == ('a','c'): add_tagged_sel('CLAIM', prompt_note=False)
+            elif key_seq == ('a','d'): add_tagged_sel('PROTO', prompt_note=False)
+            elif key_seq == ('a','e'): add_tagged_sel('EDIT',  prompt_note=True)
             #---------------------------------------------------------------------------- Edit a tag
-            elif key_seq == ('e','c'):                                  # Edit CLAIM tag
-                cp = self.textbuff.get_property('cursor-position')      # Get cursor position
-                tag_sel_idx  = self.tagger.store.find_selection_index(cp, name_filter='CLAIM')
-                if tag_sel_idx is not None:
-                    note = create_edit_dialog(self.tagger.store[tag_sel_idx].note)
-                    if note is not None:
-                        self.tagger.edit_tagged_sel(tag_sel_idx, note=note)
-
-            elif key_seq == ('e','e'):                                  # Edit EDIT tag
-                cp = self.textbuff.get_property('cursor-position')      # Get cursor position
-                tag_sel_idx  = self.tagger.store.find_selection_index(cp, name_filter='EDIT')
-                if tag_sel_idx is not None:
-                    note = create_edit_dialog(self.tagger.store[tag_sel_idx].note)
-                    if note is not None:
-                        self.tagger.edit_tagged_sel(tag_sel_idx, note=note)
-
+            elif key_seq == ('e','c'): edit_tagged_sel('CLAIM')
+            elif key_seq == ('e','d'): edit_tagged_sel('PROTO')
+            elif key_seq == ('e','e'): edit_tagged_sel('EDIT')
             #------------------------------------------------------------------- Reset key_seq stuff
             self.key_seq_hist = None
             self.key_seq_state = KeySequenceState.WaitingInitiator
@@ -267,22 +275,8 @@ class AnnotatorWindow(Gtk.Window):
         self.textview.set_tooltip_markup(tooltip_text)
 
 
-    # Raise a modal notification dialog
-    def raise_modal(self, message, *,
-                    message_type: Gtk.MessageType=None,
-                    buttons: Gtk.ButtonsType=None,
-                    title=None):
-        # Handle defaults
-        if buttons is None:      buttons      = Gtk.ButtonsType.OK
-        if message_type is None: message_type = Gtk.MessageType.INFO
-        if title is None:        title        = self.get_title()
+    # Create a dialog (with this as its parent), and run it
+    def raise_dialog(self, dialog, *args, **kwargs):
+        kwargs['parent'] = self
+        return dialog(*args, **kwargs).run()
 
-        # Create and raise
-        md = Gtk.MessageDialog(parent=self,
-                               message_type=message_type,
-                               buttons=buttons,
-                               message_format=message)
-        md.set_title(title)
-        resp = md.run()
-        md.destroy()
-        return resp

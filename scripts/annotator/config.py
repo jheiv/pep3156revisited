@@ -9,8 +9,9 @@ PKL_TAGSTORE = 'tagstore.pkl'
 # # UI Settings
 #===================================================================================================
 TAG_STYLE = [                                   # The order of list entries is important here,
-    ('CLAIM', dict(background="#314A94")),      #   later entries will mask earlier ones if they're
-    ('EDIT',  dict(background="#9E2650")),      #   "on top" of each other
+    ('CLAIM', dict(background="#043B12")),      #   later entries will mask earlier ones if they're
+    ('PROTO', dict(background="#314A94")),      #   "on top" of each other -- try to list these in
+    ('EDIT',  dict(background="#9E2650")),      #   order from "longest" to "shortest" width.
 ]
 
 MARKUP_STYLE = {

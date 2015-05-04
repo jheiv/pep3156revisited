@@ -73,7 +73,10 @@ class Tagger:
     def rem_tagged_sel(self):
         cp = self.buff.get_property('cursor-position')
         i = self.store.find_selection_index(cp)
-        tagged_sel = self.store.sels.pop(i)
+        try:
+            tagged_sel = self.store.sels.pop(i)
+        except TypeError:
+            return "Couldn't find tagged selection under cursor"
         print("Removed tag: %s" % tagged_sel)
 
         self.store.save()
